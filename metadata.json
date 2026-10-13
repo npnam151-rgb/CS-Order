@@ -1,0 +1,6 @@
+{
+  "name": "Bia Hơi Order - Đặt Hàng & Google Sheets",
+  "description": "Ứng dụng đặt hàng bia tươi chuyên dụng cho NV Sale, nhập nhanh danh sách điểm bán lên đến 100+ khách hàng, tự động lưu dữ liệu vào Google Sheet và quản trị danh mục sản phẩm.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

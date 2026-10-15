@@ -1,6 +1,6 @@
 {
-  "summary": "Kế hoạch kiến trúc và phát triển ứng dụng Đặt hàng Bia hơi & Quản lý điểm bán kết nối Google Sheets (Google Apps Script Web App) kèm bảng nhập nhanh theo danh sách, phân quyền Admin quản lý danh mục và báo cáo doanh số.",
-  "updatedAt": "2026-10-13T08:28:24.560071396Z",
+  "summary": "Kế hoạch nâng cấp tính năng: Ghi nhận nhiều đợt giao trong ngày kèm mốc thời gian, Tích hợp gửi thông báo tức thì vào nhóm Telegram / Zalo khi có đơn mới, và Xử lý các tình huống ngoại lệ như mất mạng 4G, ghi chú ca giao hàng khẩn cấp.",
+  "updatedAt": "2026-10-13T09:26:42.118967885Z",
   "requestFeedback": true,
   "userFacing": true
 }

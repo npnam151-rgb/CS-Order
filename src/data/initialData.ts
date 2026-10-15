@@ -59,8 +59,11 @@ export const INITIAL_SALES_REPS: string[] = [
 ];
 
 export const DEFAULT_CONFIG: AppConfig = {
-  scriptUrl: '',
-  sheetName: 'Đặt Hàng',
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbxd3j7Zucajx4i9F2GNr0RW-z9vsFN1za3re-tEW55DX-qwTOZ7RQ9puQ-xshXhqnqp/exec',
+  sheetName: 'Đặt bia sỉ',
   adminPin: '1234',
+  securityQuestion: 'Tên trường cấp 1 của bạn là gì?',
+  securityAnswer: 'chu van an',
+  recoveryEmail: 'npnam151@gmail.com',
   salesReps: INITIAL_SALES_REPS,
 };

@@ -77,6 +77,70 @@ async function startServer() {
     }
   });
 
+  // API endpoint: Fetch history from Google Sheets
+  app.post('/api/get-sheet-history', async (req, res) => {
+    try {
+      const { scriptUrl, sheetName } = req.body;
+      if (!scriptUrl) {
+        return res.status(400).json({ success: false, message: 'Thiếu scriptUrl' });
+      }
+
+      const cleanUrl = scriptUrl.trim();
+      const targetUrl = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}action=getHistory&sheetName=${encodeURIComponent(sheetName || 'Đặt bia sỉ')}`;
+
+      const response = await fetch(targetUrl, {
+        method: 'GET',
+        redirect: 'follow',
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { status: 'error', message: 'Không thể phân tích dữ liệu Google Sheet', raw: text };
+      }
+
+      return res.json(data);
+    } catch (error: any) {
+      console.error('Error in /api/get-sheet-history:', error);
+      return res.status(500).json({
+        status: 'error',
+        message: error?.message || 'Lỗi khi đọc dữ liệu từ Google Sheets',
+      });
+    }
+  });
+
+  // API endpoint: Send Telegram Notification
+  app.post('/api/send-telegram', async (req, res) => {
+    try {
+      const { botToken, chatId, text } = req.body;
+      if (!botToken || !chatId || !text) {
+        return res.status(400).json({ success: false, message: 'Thiếu tham số gửi Telegram' });
+      }
+
+      const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      const response = await fetch(telegramUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'Markdown',
+        }),
+      });
+
+      const data = await response.json();
+      return res.json(data);
+    } catch (error: any) {
+      console.error('Error sending telegram message:', error);
+      return res.status(500).json({
+        success: false,
+        message: error?.message || 'Lỗi gửi tin nhắn Telegram',
+      });
+    }
+  });
+
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {

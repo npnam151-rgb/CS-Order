@@ -51,7 +51,21 @@ export function getConfig(): AppConfig {
       return DEFAULT_CONFIG;
     }
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_CONFIG, ...parsed };
+    const scriptUrl = (parsed.scriptUrl && parsed.scriptUrl.trim())
+      ? parsed.scriptUrl.trim()
+      : DEFAULT_CONFIG.scriptUrl;
+    const sheetName = (parsed.sheetName && parsed.sheetName !== 'Đặt Hàng')
+      ? parsed.sheetName
+      : DEFAULT_CONFIG.sheetName;
+
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      scriptUrl,
+      sheetName,
+      securityQuestion: parsed.securityQuestion || DEFAULT_CONFIG.securityQuestion,
+      securityAnswer: parsed.securityAnswer || DEFAULT_CONFIG.securityAnswer,
+    };
   } catch {
     return DEFAULT_CONFIG;
   }

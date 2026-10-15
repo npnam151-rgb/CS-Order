@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Customer, ProductItem, AppConfig, OrderSubmission, OrderRowData, TableRowEntry } from './types';
 import {
   getCustomers,
@@ -14,8 +14,6 @@ import {
   saveConfig,
   getOrderHistory,
   addOrderSubmission,
-  getDraftTableRows,
-  saveDraftTableRows,
   clearDraft,
 } from './services/storage';
 import {
@@ -27,14 +25,12 @@ import {
 import { Header } from './components/Header';
 import { OrderMatrix } from './components/OrderMatrix';
 import { AdminPanel } from './components/AdminPanel';
-import { OrderHistoryView } from './components/OrderHistoryView';
-import { GoogleSheetGuideModal } from './components/GoogleSheetGuideModal';
 import { BulkImportModal } from './components/BulkImportModal';
 
 export default function App() {
-  // Navigation & Modals
-  const [currentTab, setCurrentTab] = useState<'order' | 'history' | 'admin'>('order');
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  // Navigation
+  const [currentTab, setCurrentTab] = useState<'order' | 'admin'>('order');
+  const [adminSubTab, setAdminSubTab] = useState<'customers' | 'products' | 'settings' | 'reports'>('customers');
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   // Persistent Core Data
@@ -101,7 +97,6 @@ export default function App() {
   const handleRemoveRow = (rowId: string) => {
     setRows(prev => prev.filter(r => r.rowId !== rowId));
   };
-
 
   // Clear all rows
   const handleClearAllRows = () => {
@@ -253,15 +248,20 @@ export default function App() {
     handleUpdateCustomers(nextList);
   };
 
+  // Open Admin with target tab
+  const handleOpenAdmin = (tab?: 'customers' | 'products' | 'settings' | 'reports') => {
+    if (tab) {
+      setAdminSubTab(tab);
+    }
+    setCurrentTab('admin');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
-      {/* Top Bar with prominent Admin Button */}
+      {/* Top Bar with clean Order and Admin navigation */}
       <Header
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
-        onOpenGuide={() => setIsGuideOpen(true)}
-        onOpenBulkImport={() => setIsBulkImportOpen(true)}
-        hasScriptConfigured={Boolean(config.scriptUrl && config.scriptUrl.trim())}
         activeOrderCount={activeOrderCount}
       />
 
@@ -285,16 +285,7 @@ export default function App() {
             isSubmitting={isSubmitting}
             submitStatus={submitStatus}
             hasScriptConfigured={Boolean(config.scriptUrl && config.scriptUrl.trim())}
-            onOpenAdmin={() => setCurrentTab('admin')}
-            onOpenGuide={() => setIsGuideOpen(true)}
-          />
-        )}
-
-        {currentTab === 'history' && (
-          <OrderHistoryView
-            history={orderHistory}
-            products={products}
-            onBackToOrder={() => setCurrentTab('order')}
+            onOpenAdmin={handleOpenAdmin}
           />
         )}
 
@@ -309,20 +300,11 @@ export default function App() {
             orderHistory={orderHistory}
             onOpenBulkImport={() => setIsBulkImportOpen(true)}
             onTestConnection={testConnection}
+            initialTab={adminSubTab}
+            onBackToOrder={() => setCurrentTab('order')}
           />
         )}
       </main>
-
-      {/* Google Sheet Setup Modal */}
-      <GoogleSheetGuideModal
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
-        scriptUrl={config.scriptUrl}
-        onSaveScriptUrl={url => {
-          handleUpdateConfig({ ...config, scriptUrl: url });
-        }}
-        onTestConnection={testConnection}
-      />
 
       {/* Bulk Import Modal */}
       <BulkImportModal
@@ -334,7 +316,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="py-4 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
-        <p>Hệ Thống Đặt Hàng Bia Tươi & Đồng Bộ Google Sheets · Hỗ trợ Dropdown hơn 100+ điểm bán</p>
+        <p>CS Order · Hệ Thống Đặt Hàng Bia Hơi & Đồng Bộ Google Sheets</p>
       </footer>
     </div>
   );

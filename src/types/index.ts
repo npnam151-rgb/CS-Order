@@ -22,6 +22,8 @@ export interface OrderRowData {
   customerName: string;
   quantities: Record<string, number>; // key: product.id -> number
   notes?: string;
+  deliveryTimeSlot?: string;
+  orderBatchNum?: number;
 }
 
 export interface TableRowEntry {
@@ -29,6 +31,8 @@ export interface TableRowEntry {
   customerId: string; // selected from customer dropdown
   quantities: Record<string, number>;
   notes?: string;
+  deliveryTimeSlot?: string;
+  orderBatchNum?: number;
 }
 
 export interface OrderSubmission {
@@ -48,5 +52,10 @@ export interface AppConfig {
   scriptUrl: string;
   sheetName: string;
   adminPin: string;
+  securityQuestion: string; // Câu hỏi bảo mật do người dùng tự setup
+  securityAnswer: string;   // Câu trả lời bảo mật
+  recoveryEmail?: string;
   salesReps: string[];
+  telegramBotToken?: string;
+  telegramChatId?: string;
 }

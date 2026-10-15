@@ -37,8 +37,7 @@ interface OrderMatrixProps {
   isSubmitting: boolean;
   submitStatus: { success: boolean; message: string } | null;
   hasScriptConfigured: boolean;
-  onOpenAdmin: () => void;
-  onOpenGuide: () => void;
+  onOpenAdmin: (tab?: 'customers' | 'products' | 'settings' | 'reports') => void;
 }
 
 export const OrderMatrix: React.FC<OrderMatrixProps> = ({
@@ -59,7 +58,6 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
   submitStatus,
   hasScriptConfigured,
   onOpenAdmin,
-  onOpenGuide,
 }) => {
   const activeProducts = useMemo(() => products.filter(p => p.active), [products]);
   const activeCustomers = useMemo(() => customers.filter(c => c.active), [customers]);
@@ -231,35 +229,6 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Admin Notice Banner - Explicit access info */}
-      <div className="bg-linear-to-r from-amber-500/10 via-amber-50 to-orange-50 rounded-xl border border-amber-300 p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Settings className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
-              <span>Quản Lý Danh Sách Quán Dropdown Trong Module Admin:</span>
-              <span className="text-[11px] font-mono bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-bold">
-                MÃ PIN: 1234
-              </span>
-            </h3>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Thêm/sửa quán, nạp 100+ quán, quản lý các loại bia và xem báo cáo bằng nút <b>Quản Trị Admin</b> góc trên cùng.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onOpenAdmin}
-          className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-colors shrink-0 flex items-center gap-1.5 self-end md:self-auto cursor-pointer"
-        >
-          <Settings className="w-3.5 h-3.5 text-amber-400" />
-          <span>Vào Module Admin Ngay</span>
-        </button>
-      </div>
-
       {/* Basic Date and Sales Rep Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -332,7 +301,7 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
 
           <button
             type="button"
-            onClick={onOpenAdmin}
+            onClick={() => onOpenAdmin('customers')}
             className="text-xs text-amber-800 hover:text-amber-950 font-semibold flex items-center gap-1 hover:underline cursor-pointer"
             title="Thêm hoặc sửa danh sách quán trong Admin"
           >
@@ -674,14 +643,14 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
             <span>
-              Chưa lưu Web App URL Google Sheets. Bạn vẫn có thể nhập đơn và tải file Excel/CSV ngay.
+              Chưa lưu Web App URL Google Sheets. Bạn có thể cài đặt kết nối trong module Admin hoặc tải file Excel/CSV.
             </span>
           </div>
           <button
-            onClick={onOpenGuide}
+            onClick={() => onOpenAdmin('settings')}
             className="px-3 py-1 font-bold text-amber-900 bg-amber-200 hover:bg-amber-300 rounded-lg shrink-0 transition-colors cursor-pointer"
           >
-            Kết Nối Sheet (1 phút)
+            Cài Đặt Sheet Trong Admin
           </button>
         </div>
       )}

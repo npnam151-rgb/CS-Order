@@ -26,6 +26,7 @@ import {
   Laptop,
   Search,
   Filter,
+  AlertCircle,
 } from 'lucide-react';
 import { Customer, ProductItem, AppConfig, OrderSubmission } from '../types';
 import {
@@ -33,6 +34,7 @@ import {
   fetchSheetHistory,
   syncProductsToGoogleSheets,
   SheetHistoryRecord,
+  fetchCustomersFromSheet,
 } from '../services/googleSheets';
 
 interface AdminPanelProps {
@@ -82,6 +84,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newCustomerName, setNewCustomerName] = useState('');
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [editingCustomerName, setEditingCustomerName] = useState('');
+  const [isSyncingCustomers, setIsSyncingCustomers] = useState(false);
+  const [customerSyncMsg, setCustomerSyncMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   // Product Management states
   const [newProductName, setNewProductName] = useState('');
@@ -207,6 +211,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateCustomers(
       customers.map(c => (c.id === id ? { ...c, active: !c.active } : c))
     );
+  };
+
+  // Đồng bộ danh sách quán trực tiếp từ sheet "Đặt Hàng"
+  const handleSyncCustomersFromSheet = async () => {
+    if (!config.scriptUrl || !config.scriptUrl.trim()) {
+      setCustomerSyncMsg({
+        success: false,
+        text: 'Chưa cấu hình URL Google Sheet trong mục Cài Đặt.',
+      });
+      return;
+    }
+
+    setIsSyncingCustomers(true);
+    setCustomerSyncMsg(null);
+    try {
+      const res = await fetchCustomersFromSheet(config.scriptUrl, 'Đặt Hàng');
+      if (res.success && res.customers.length > 0) {
+        onUpdateCustomers(res.customers);
+        setCustomerSyncMsg({
+          success: true,
+          text: `Đồng bộ thành công ${res.customers.length} quán từ trang tính "Đặt Hàng"!`,
+        });
+      } else {
+        setCustomerSyncMsg({
+          success: false,
+          text: res.message || 'Không thể đồng bộ quán từ sheet "Đặt Hàng".',
+        });
+      }
+    } catch (e: any) {
+      setCustomerSyncMsg({
+        success: false,
+        text: `Lỗi kết nối: ${e?.message || e}`,
+      });
+    } finally {
+      setIsSyncingCustomers(false);
+      setTimeout(() => {
+        setCustomerSyncMsg(null);
+      }, 6000);
+    }
   };
 
   // Product sync to Google Sheets
@@ -665,14 +708,61 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Tab 1: Quản lý Điểm Bán / Khách Hàng */}
       {activeTab === 'customers' && (
-        <div className="p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="p-6 space-y-5">
+          {/* Notification Banner */}
+          {customerSyncMsg && (
+            <div
+              className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 shadow-xs transition-all ${
+                customerSyncMsg.success
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  : 'bg-rose-50 text-rose-800 border border-rose-200'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {customerSyncMsg.success ? (
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span>{customerSyncMsg.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomerSyncMsg(null)}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Sheet Đặt Hàng Info Note */}
+          <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs text-amber-950">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                Nguồn danh sách quán: Trang tính <strong>"Đặt Hàng"</strong> (Cột B: Mã, Cột C: Tên KH). Hiện có <strong>{customers.length} quán</strong>.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncCustomersFromSheet}
+              disabled={isSyncingCustomers}
+              className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Đọc trực tiếp danh sách quán từ trang tính 'Đặt Hàng' trong Google Sheet"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCustomers ? 'animate-spin' : ''}`} />
+              <span>{isSyncingCustomers ? 'Đang đọc sheet...' : 'Đồng bộ từ Sheet "Đặt Hàng"'}</span>
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <form onSubmit={handleAddCustomer} className="flex-1 flex gap-2 max-w-md">
               <input
                 type="text"
                 value={newCustomerName}
                 onChange={e => setNewCustomerName(e.target.value)}
-                placeholder="Nhập tên quán mới vào Dropdown..."
+                placeholder="Thêm nhanh tên quán mới..."
                 className="flex-1 px-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
               <button
@@ -684,21 +774,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
             </form>
 
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                value={customerSearch}
-                onChange={e => setCustomerSearch(e.target.value)}
-                placeholder="Lọc tên quán..."
-                className="px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 w-44"
-              />
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={e => setCustomerSearch(e.target.value)}
+                  placeholder="Tìm kiếm quán, mã..."
+                  className="pl-8 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 w-48"
+                />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
 
               <button
                 onClick={onOpenBulkImport}
-                className="px-4 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                className="px-3.5 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span>Nhập 100+ Quán Hàng Loạt</span>
+                <span>Nhập Hàng Loạt</span>
               </button>
             </div>
           </div>
@@ -707,17 +800,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <table className="w-full text-left text-sm divide-y divide-slate-200">
               <thead className="bg-slate-50 text-xs font-bold text-slate-700 uppercase sticky top-0 z-10">
                 <tr>
-                  <th className="py-3 px-4 w-12 text-center">STT</th>
-                  <th className="py-3 px-4">Tên Quán Trong Dropdown</th>
-                  <th className="py-3 px-4 w-32 text-center">Trạng Thái</th>
-                  <th className="py-3 px-4 w-32 text-right">Thao Tác</th>
+                  <th className="py-3 px-3 w-12 text-center">STT</th>
+                  <th className="py-3 px-3 w-20 text-center">Mã</th>
+                  <th className="py-3 px-4">Tên Quán / Khách Hàng</th>
+                  <th className="py-3 px-4 w-28 text-center">Trạng Thái</th>
+                  <th className="py-3 px-4 w-28 text-right">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredCustomers.map((cust, idx) => (
                   <tr key={cust.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-2.5 px-4 text-center font-mono text-xs text-slate-400">
-                      {idx + 1}
+                    <td className="py-2.5 px-3 text-center font-mono text-xs text-slate-400">
+                      {cust.orderIndex || idx + 1}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="font-mono text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">
+                        {cust.code || '-'}
+                      </span>
                     </td>
                     <td className="py-2.5 px-4 font-semibold text-slate-900">
                       {editingCustomerId === cust.id ? (

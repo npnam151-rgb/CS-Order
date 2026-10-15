@@ -15,7 +15,12 @@ export function getCustomers(): Customer[] {
       return INITIAL_CUSTOMERS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_CUSTOMERS;
+    if (Array.isArray(parsed) && parsed.length >= 50 && parsed.some(c => c.code)) {
+      return parsed;
+    }
+    // Upgrade old dummy list to real 275 customers from sheet Đặt Hàng
+    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(INITIAL_CUSTOMERS));
+    return INITIAL_CUSTOMERS;
   } catch {
     return INITIAL_CUSTOMERS;
   }

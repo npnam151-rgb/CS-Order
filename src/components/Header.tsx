@@ -26,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Beer className="w-5 h-5" />
             </div>
             <span className="text-xl font-bold tracking-tight text-slate-900 whitespace-nowrap">
-              CS Order
+              Đặt hàng kênh sỉ
             </span>
           </button>
 

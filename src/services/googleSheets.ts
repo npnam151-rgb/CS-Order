@@ -1,4 +1,4 @@
-import { ProductItem, OrderRowData } from '../types';
+import { Customer, ProductItem, OrderRowData } from '../types';
 
 export const APPS_SCRIPT_TEMPLATE = `/**
  * Google Apps Script - CS Order (Bản chuẩn 100% - Chống đè tên NV & Tự động chèn cột mặt hàng mới)
@@ -749,3 +749,70 @@ export function exportToCSV(
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Đọc trực tiếp danh sách khách hàng từ trang tính "Đặt Hàng" trong cùng file Google Spreadsheet
+ */
+export async function fetchCustomersFromSheet(
+  scriptUrl: string,
+  sheetName: string = 'Đặt Hàng'
+): Promise<{ success: boolean; customers: Customer[]; message: string }> {
+  try {
+    if (!scriptUrl || !scriptUrl.trim()) {
+      return { success: false, customers: [], message: 'Chưa cấu hình URL Google Apps Script.' };
+    }
+
+    const cleanUrl = scriptUrl.trim();
+    const targetUrl = `${cleanUrl}?action=getHistory&sheetName=${encodeURIComponent(sheetName)}`;
+
+    let data: any = null;
+    try {
+      const res = await fetch(targetUrl);
+      data = await res.json();
+    } catch {
+      // Fallback qua proxy route
+      const proxyRes = await fetch(`/api/sync-sheets?action=getHistory&sheetName=${encodeURIComponent(sheetName)}`);
+      data = await proxyRes.json();
+    }
+
+    if (!data || data.status !== 'success' || !Array.isArray(data.records)) {
+      return {
+        success: false,
+        customers: [],
+        message: data?.message || `Không thể đọc dữ liệu từ sheet "${sheetName}".`,
+      };
+    }
+
+    const customers: Customer[] = [];
+    data.records.forEach((r: any, idx: number) => {
+      const vals = r.values || [];
+      const stt = vals[0];
+      const code = vals[1] !== undefined ? String(vals[1]).trim() : '';
+      const name = vals[2] !== undefined ? String(vals[2]).trim() : '';
+
+      // Bỏ qua dòng tiêu đề nếu lọt vào hoặc tên rỗng
+      if (name && name.toLowerCase() !== 'tên kh' && name.toLowerCase() !== 'ten kh') {
+        customers.push({
+          id: `c_${code || idx + 1}`,
+          code: code || undefined,
+          name: name,
+          active: true,
+          orderIndex: Number(stt) || (idx + 1),
+        });
+      }
+    });
+
+    return {
+      success: true,
+      customers,
+      message: `Đã đồng bộ thành công ${customers.length} quán từ sheet "${sheetName}".`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      customers: [],
+      message: `Lỗi kết nối đồng bộ: ${err?.message || err}`,
+    };
+  }
+}
+

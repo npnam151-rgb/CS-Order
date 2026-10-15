@@ -8,7 +8,7 @@ export function formatTelegramMessage(
   isTest: boolean = false
 ): string {
   if (isTest) {
-    return `🔔 *[CS ORDER] KIỂM TRA KẾT NỐI*\n\n✅ Nhóm chat đã được kết nối thành công với Hệ thống CS Order!\n📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+    return `🔔 *[ĐẶT HÀNG KÊNH SỈ] KIỂM TRA KẾT NỐI*\n\n✅ Nhóm chat đã được kết nối thành công với Hệ thống Đặt hàng kênh sỉ!\n📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
   }
 
   const activeProducts = products.filter(p => p.active);
@@ -20,7 +20,7 @@ export function formatTelegramMessage(
     totals[p.id] = 0;
   });
 
-  let lines = `🍺 *[CS ORDER] ĐƠN ĐẶT HÀNG MỚI*\n`;
+  let lines = `🍺 *[ĐẶT HÀNG KÊNH SỈ] ĐƠN ĐẶT HÀNG MỚI*\n`;
   lines += `📅 Ngày: ${orderDate} · ${nowTime}\n`;
   lines += `👤 NV Sale: *${salesRep}*\n\n`;
   lines += `📋 *DANH SÁCH CÁC QUÁN:*\n`;

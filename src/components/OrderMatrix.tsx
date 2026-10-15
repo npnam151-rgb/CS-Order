@@ -19,6 +19,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { Customer, ProductItem, TableRowEntry } from '../types';
+import { CustomerAutocomplete } from './CustomerAutocomplete';
 
 interface OrderMatrixProps {
   customers: Customer[];
@@ -77,7 +78,7 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
   const [isEditingExisting, setIsEditingExisting] = useState<boolean>(false);
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
-  const customerSelectRef = useRef<HTMLSelectElement>(null);
+  const customerInputRef = useRef<HTMLInputElement>(null);
 
   const handleResetClick = () => {
     if (!confirmReset) {
@@ -145,8 +146,8 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
   // Click (+) Thêm khách tiếp theo
   const handleAddNextCustomer = () => {
     if (!selectedCustomerId) {
-      setFormValidationMsg('Vui lòng chọn Quán / Khách hàng từ menu Dropdown trước!');
-      customerSelectRef.current?.focus();
+      setFormValidationMsg('Vui lòng tìm và chọn Quán / Khách hàng trước!');
+      customerInputRef.current?.focus();
       return;
     }
 
@@ -166,9 +167,9 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
     setFormValidationMsg(null);
     setIsEditingExisting(false);
 
-    // Focus back on customer select
+    // Focus back on customer search input
     setTimeout(() => {
-      customerSelectRef.current?.focus();
+      customerInputRef.current?.focus();
     }, 50);
   };
 
@@ -190,7 +191,7 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
     setFormValidationMsg(null);
     // Smooth scroll to top form
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    customerSelectRef.current?.focus();
+    customerInputRef.current?.focus();
   };
 
   // Totals calculations
@@ -232,11 +233,11 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
       {/* Basic Date and Sales Rep Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Order Date (Column A) */}
+          {/* Order Date */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-amber-600" />
-              <span>Ngày đặt hàng (Cột A)</span>
+              <span>Ngày đặt hàng</span>
             </label>
             <div className="flex gap-2">
               <input
@@ -255,11 +256,11 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
             </div>
           </div>
 
-          {/* Sales Rep (Column B) */}
+          {/* Sales Rep */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <User className="w-4 h-4 text-amber-600" />
-              <span>NV Sale đặt đơn (Cột B)</span>
+              <span>NV Sale đặt đơn</span>
             </label>
             <div className="relative">
               <input
@@ -291,10 +292,10 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                {isEditingExisting ? 'Chỉnh Sửa Đơn Hàng Của Quán' : 'Nhập Đơn Từng Khách Hàng (Dropdown)'}
+                {isEditingExisting ? 'Chỉnh Sửa Đơn Hàng Của Quán' : 'Nhập Đơn Từng Quán (Tìm Kiếm Thông Minh)'}
               </h2>
               <p className="text-xs text-slate-500">
-                Chọn quán từ menu Dropdown, chọn số lượng bia rồi nhấn nút <b>(+) Thêm khách tiếp theo</b>
+                Gõ tên quán (hỗ trợ không dấu), chọn số lượng bia rồi nhấn nút <b>(+) Thêm khách tiếp theo</b>
               </p>
             </div>
           </div>
@@ -306,36 +307,27 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
             title="Thêm hoặc sửa danh sách quán trong Admin"
           >
             <Settings className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Quản lý quán trong Admin</span>
+            <span className="hidden sm:inline">Quản lý danh sách quán ({customers.length})</span>
           </button>
         </div>
 
-        {/* Step 1: Customer Dropdown Selection */}
+        {/* Step 1: Searchable Customer Combobox */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-            1. Chọn Quán / Khách hàng (Cột C):
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+            <span>1. Chọn Quán / Khách hàng (Cột C) - Hỗ trợ gõ tìm kiếm:</span>
+            <span className="text-[11px] font-normal text-slate-500 lowercase">
+              {activeCustomers.length} quán trong hệ thống
+            </span>
           </label>
-          <div className="relative">
-            <select
-              ref={customerSelectRef}
-              value={selectedCustomerId}
-              onChange={e => handleSelectCustomer(e.target.value)}
-              className="w-full py-3 pl-4 pr-10 text-base font-semibold rounded-xl border-2 border-amber-300 bg-amber-50/40 text-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white cursor-pointer shadow-xs transition-all"
-            >
-              <option value="">
-                -- Bấm vào đây để chọn quán ({activeCustomers.length} quán trong Dropdown) --
-              </option>
-              {activeCustomers.map(c => {
-                const isAlreadyInList = rows.some(r => r.customerId === c.id);
-                return (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {isAlreadyInList ? '✓ (Đã có trong danh sách hôm nay)' : ''}
-                  </option>
-                );
-              })}
-            </select>
-            <ChevronDown className="w-5 h-5 text-amber-700 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <CustomerAutocomplete
+            customers={customers}
+            products={activeProducts}
+            selectedCustomerId={selectedCustomerId}
+            onSelectCustomer={handleSelectCustomer}
+            rows={rows}
+            onOpenAdminCustomers={() => onOpenAdmin('customers')}
+            inputRef={customerInputRef}
+          />
         </div>
 
         {/* Step 2: Product Quantities Steppers */}

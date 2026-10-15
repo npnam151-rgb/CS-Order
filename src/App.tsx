@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Customer, ProductItem, AppConfig, OrderSubmission, OrderRowData, TableRowEntry } from './types';
 import {
   getCustomers,
@@ -21,6 +21,7 @@ import {
   sendOrderToGoogleSheets,
   exportToCSV,
   testConnection,
+  fetchCustomersFromSheet,
 } from './services/googleSheets';
 import { Header } from './components/Header';
 import { OrderMatrix } from './components/OrderMatrix';
@@ -49,7 +50,7 @@ export default function App() {
   }, []);
 
   const [orderDate, setOrderDate] = useState<string>(todayStr);
-  const [salesRep, setSalesRep] = useState<string>(() => config.salesReps[0] || 'Nguyễn Văn Nam');
+  const [salesRep, setSalesRep] = useState<string>('');
 
   // Table rows with dropdown - always starts completely empty on app open
   const [rows, setRows] = useState<TableRowEntry[]>([]);
@@ -57,6 +58,27 @@ export default function App() {
   // Submission State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Tự động kiểm tra và đồng bộ danh sách 275+ quán từ sheet "Đặt Hàng"
+  useEffect(() => {
+    if (config.scriptUrl) {
+      fetchCustomersFromSheet(config.scriptUrl, 'Đặt Hàng')
+        .then(res => {
+          if (res.success && res.customers.length > 0) {
+            setCustomers(prev => {
+              if (res.customers.length !== prev.length || prev.length < 50) {
+                saveCustomers(res.customers);
+                return res.customers;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {
+          // silent fallback
+        });
+    }
+  }, [config.scriptUrl]);
 
   // When order date changes, clear table for new date
   const handleDateChange = (newDate: string) => {
@@ -324,7 +346,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="py-4 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
-        <p>CS Order · Hệ Thống Đặt Hàng Bia Hơi & Đồng Bộ Google Sheets</p>
+        <p>Đặt hàng kênh sỉ · Hệ Thống Đặt Hàng Bia Hơi & Đồng Bộ Google Sheets</p>
       </footer>
     </div>
   );

@@ -122,7 +122,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isLoadingSheetHistory, setIsLoadingSheetHistory] = useState(false);
   const [sheetHistoryError, setSheetHistoryError] = useState<string | null>(null);
   const [isLegacyScriptWarning, setIsLegacyScriptWarning] = useState(false);
-  const [historySource, setHistorySource] = useState<'sheet' | 'local'>('sheet');
+  const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
+  const [hideEmptyOrders, setHideEmptyOrders] = useState<boolean>(false);
+  const [autoRefreshHistory, setAutoRefreshHistory] = useState<boolean>(true);
 
   // Filters for history
   const [historyFilterDate, setHistoryFilterDate] = useState('');
@@ -146,6 +148,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (res.success) {
       setSheetHistoryHeaders(res.headers);
       setSheetHistoryRecords(res.records);
+      setLastFetchedAt(new Date().toLocaleTimeString('vi-VN'));
     } else {
       if (res.isLegacyScript) {
         setIsLegacyScriptWarning(true);
@@ -160,6 +163,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       handleFetchSheetHistory();
     }
   }, [isAuthenticated, activeTab, config.scriptUrl, config.sheetName]);
+
+  // Periodic auto-refresh every 20 seconds to always show the newest rows
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== 'reports' || !config.scriptUrl || !autoRefreshHistory) {
+      return;
+    }
+    const interval = setInterval(() => {
+      handleFetchSheetHistory();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, activeTab, config.scriptUrl, config.sheetName, autoRefreshHistory]);
 
   // Authentication logic: STRICTLY match the current active PIN only
   const handleLogin = (e: React.FormEvent) => {
@@ -421,9 +435,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       if (historySearchCust && !r.customerName.toLowerCase().includes(historySearchCust.toLowerCase())) {
         return false;
       }
+      if (hideEmptyOrders) {
+        const hasQty = Object.values(r.quantities).some(q => q > 0);
+        if (!hasQty) return false;
+      }
       return true;
     });
-  }, [sheetHistoryRecords, historyFilterDate, historyFilterRep, historySearchCust]);
+  }, [sheetHistoryRecords, historyFilterDate, historyFilterRep, historySearchCust, hideEmptyOrders]);
+
+  // Count orders with actual items vs empty/blank test rows
+  const ordersWithQtyCount = useMemo(() => {
+    return sheetHistoryRecords.filter(r => Object.values(r.quantities).some(q => q > 0)).length;
+  }, [sheetHistoryRecords]);
+
+  const emptyOrdersCount = useMemo(() => {
+    return sheetHistoryRecords.length - ordersWithQtyCount;
+  }, [sheetHistoryRecords, ordersWithQtyCount]);
 
   // Product headers found in Google Sheet (columns after customer, before time)
   const sheetProductHeaders = useMemo(() => {
@@ -1367,7 +1394,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {lastFetchedAt && (
+                <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2.5 py-1 rounded-md">
+                  Cập nhật lúc: {lastFetchedAt}
+                </span>
+              )}
+              <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoRefreshHistory}
+                  onChange={e => setAutoRefreshHistory(e.target.checked)}
+                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                />
+                <span>Tự động cập nhật (20s)</span>
+              </label>
               <button
                 type="button"
                 onClick={handleFetchSheetHistory}
@@ -1402,10 +1443,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* Metrics summary cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-xs font-medium text-slate-500 block">Tổng Đơn Trên Sheet</span>
+              <span className="text-xs font-medium text-slate-500 block">Tổng Dòng Trên Sheet</span>
               <span className="text-2xl font-bold text-slate-900 font-mono tabular-nums mt-1 block">
                 {filteredSheetRecords.length}{' '}
                 <span className="text-xs font-normal text-slate-400">/ {sheetHistoryRecords.length} dòng</span>
+              </span>
+              <span className="text-[11px] text-slate-500 block mt-1">
+                {ordersWithQtyCount} dòng có số lượng · {emptyOrdersCount} dòng trống
               </span>
             </div>
 
@@ -1463,13 +1507,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               />
             </div>
 
-            {(historyFilterDate || historyFilterRep || historySearchCust) && (
+            {/* Toggle hide empty orders */}
+            <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer bg-white px-2.5 py-1.5 border border-slate-300 rounded-lg select-none hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={hideEmptyOrders}
+                onChange={e => setHideEmptyOrders(e.target.checked)}
+                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span>Chỉ hiện dòng có bia ({ordersWithQtyCount})</span>
+            </label>
+
+            {(historyFilterDate || historyFilterRep || historySearchCust || hideEmptyOrders) && (
               <button
                 type="button"
                 onClick={() => {
                   setHistoryFilterDate('');
                   setHistoryFilterRep('');
                   setHistorySearchCust('');
+                  setHideEmptyOrders(false);
                 }}
                 className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer"
               >

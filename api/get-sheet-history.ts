@@ -3,6 +3,10 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ success: false, message: 'Method Not Allowed' });
   }
 
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     const { scriptUrl, sheetName } = req.body || {};
     if (!scriptUrl) {
@@ -10,11 +14,16 @@ export default async function handler(req: any, res: any) {
     }
 
     const cleanUrl = scriptUrl.trim();
-    const targetUrl = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}action=getHistory&sheetName=${encodeURIComponent(sheetName || 'Đặt bia sỉ')}`;
+    const targetUrl = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}action=getHistory&sheetName=${encodeURIComponent(sheetName || 'Đặt bia sỉ')}&_t=${Date.now()}`;
 
     const response = await fetch(targetUrl, {
       method: 'GET',
       redirect: 'follow',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache',
+      },
     });
 
     const text = await response.text();

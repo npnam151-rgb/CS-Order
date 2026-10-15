@@ -561,7 +561,11 @@ export async function fetchSheetHistory(
   try {
     const res = await fetch('/api/get-sheet-history', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+      },
+      cache: 'no-store',
       body: JSON.stringify({ scriptUrl: cleanUrl, sheetName: cleanSheetName }),
     });
 
@@ -584,12 +588,16 @@ export async function fetchSheetHistory(
     console.warn('Proxy get-sheet-history failed, trying direct fetch...', proxyError);
   }
 
-  // 2. Direct fetch with ?action=getHistory
+  // 2. Direct fetch with ?action=getHistory & cache buster
   try {
-    const directUrl = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}action=getHistory&sheetName=${encodeURIComponent(cleanSheetName)}`;
+    const directUrl = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}action=getHistory&sheetName=${encodeURIComponent(cleanSheetName)}&_t=${Date.now()}`;
     const res = await fetch(directUrl, {
       method: 'GET',
       redirect: 'follow',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
     });
 
     if (res.ok) {

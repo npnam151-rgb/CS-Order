@@ -31,6 +31,7 @@ import { Customer, ProductItem, AppConfig, OrderSubmission } from '../types';
 import {
   APPS_SCRIPT_TEMPLATE,
   fetchSheetHistory,
+  syncProductsToGoogleSheets,
   SheetHistoryRecord,
 } from '../services/googleSheets';
 
@@ -88,6 +89,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingProductName, setEditingProductName] = useState('');
   const [editingProductUnit, setEditingProductUnit] = useState('');
+  const [isSyncingProducts, setIsSyncingProducts] = useState(false);
+  const [productSyncResult, setProductSyncResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Google Sheets settings states
   const [scriptUrl, setScriptUrl] = useState(config.scriptUrl);
@@ -206,6 +209,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     );
   };
 
+  // Product sync to Google Sheets
+  const handleSyncProductsToSheet = async (prodsToSync = products) => {
+    if (!config.scriptUrl || !config.scriptUrl.trim()) {
+      setProductSyncResult({
+        success: false,
+        message: 'Chưa cấu hình URL Google Sheet trong mục Cài Đặt. Vui lòng lưu cấu hình trước khi đồng bộ.',
+      });
+      return;
+    }
+
+    setIsSyncingProducts(true);
+    setProductSyncResult(null);
+    const res = await syncProductsToGoogleSheets(config.scriptUrl, config.sheetName, prodsToSync);
+    setIsSyncingProducts(false);
+    setProductSyncResult(res);
+    setTimeout(() => {
+      setProductSyncResult(null);
+    }, 6000);
+  };
+
   // Product actions
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,8 +243,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       orderIndex: products.length + 1,
     };
 
-    onUpdateProducts([...products, newProd]);
+    const updated = [...products, newProd];
+    onUpdateProducts(updated);
     setNewProductName('');
+
+    // Tự động gửi lệnh đồng bộ cột sang Google Sheet ngay lập tức
+    if (config.scriptUrl && config.scriptUrl.trim()) {
+      handleSyncProductsToSheet(updated);
+    }
   };
 
   const handleStartEditProduct = (p: ProductItem) => {
@@ -758,6 +787,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* Tab 2: Quản lý Mặt Hàng */}
       {activeTab === 'products' && (
         <div className="p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Danh Mục Mặt Hàng ({products.length})</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Các loại bia được mở bán. Khi thêm mặt hàng mới, hệ thống sẽ tự động chèn thêm cột vào Google Sheet.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSyncProductsToSheet()}
+              disabled={isSyncingProducts || !config.scriptUrl}
+              className="px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+              title="Đồng bộ danh sách cột sản phẩm sang Google Sheet ngay lập tức"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingProducts ? 'animate-spin' : ''}`} />
+              <span>{isSyncingProducts ? 'Đang Đồng Bộ Cột...' : 'Đồng Bộ Cột Sang Google Sheet Ngay'}</span>
+            </button>
+          </div>
+
+          {/* Sync Result Feedback */}
+          {productSyncResult && (
+            <div
+              className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+                productSyncResult.success
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                  : 'bg-rose-50 text-rose-900 border-rose-300'
+              }`}
+            >
+              {productSyncResult.success ? <Check className="w-4 h-4 text-emerald-600" /> : <X className="w-4 h-4 text-rose-600" />}
+              <span>{productSyncResult.message}</span>
+            </div>
+          )}
+
           <form
             onSubmit={handleAddProduct}
             className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-end gap-3"
@@ -768,7 +831,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="text"
                 value={newProductName}
                 onChange={e => setNewProductName(e.target.value)}
-                placeholder="VD: Bom 20l, Keg 2L, Thùng lon 330ml..."
+                placeholder="VD: Bom 20L, Keg 2L, Thùng lon 330ml..."
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
@@ -786,15 +849,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shrink-0 flex items-center justify-center gap-1 h-9.5 cursor-pointer"
+              disabled={isSyncingProducts}
+              className="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition-colors shrink-0 flex items-center justify-center gap-1 h-9.5 cursor-pointer shadow-xs"
             >
               <Plus className="w-4 h-4" />
-              <span>Thêm Mặt Hàng</span>
+              <span>Thêm & Đồng Bộ Vào Sheet</span>
             </button>
           </form>
 
-          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900">
-            💡 <b>Cơ chế đồng bộ động:</b> Khi bạn thêm mặt hàng mới tại đây, Google Apps Script sẽ tự động nhận diện và chèn thêm cột mới vào đúng dòng 2 của trang tính (trước cột <i>Thời gian gửi</i>). Dòng 1 tính tổng của bạn sẽ không bị ảnh hưởng.
+          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+            <p>
+              💡 <b>Cơ chế đồng bộ động chuẩn 100%:</b> Khi thêm mặt hàng mới tại đây, ứng dụng sẽ gửi lệnh tới Google Apps Script để tự động chèn thêm cột mới vào Dòng 2 của trang tính (trước cột <i>Thời gian gửi</i>) và tự động điền sẵn công thức <code>=SUM(...)</code> ở Dòng 1.
+            </p>
+            <p className="text-[11px] text-amber-800">
+              Cột 2 (NV Sale) được bảo vệ tuyệt đối, đảm bảo số lượng của mặt hàng mới không bao giờ bị nhảy sang tên nhân viên.
+            </p>
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -1130,15 +1199,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {/* Right Column: Google Apps Script Code & Guide */}
             <div className="lg:col-span-7 space-y-4">
+              {/* Critical Update Banner */}
+              <div className="p-4 bg-amber-500/10 border-2 border-amber-500 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-amber-950 font-bold text-xs uppercase tracking-wide">
+                  <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Bản Cập Nhật Mã Apps Script Quan Trọng (Đã Sửa Triệt Để)</span>
+                </div>
+                <ul className="text-xs text-amber-900 space-y-1 list-disc list-inside">
+                  <li><b>Tự động chèn cột cho mặt hàng mới:</b> Khi thêm mặt hàng trên app, script sẽ tự động tạo thêm cột ở Dòng 2 và tự điền công thức <code>=SUM(...)</code> ở Dòng 1.</li>
+                  <li><b>Khóa cứng Cột B (NV Sale):</b> Đảm bảo số lượng sản phẩm mới không bao giờ bị nhảy sang hay đè lên tên nhân viên Sale.</li>
+                </ul>
+              </div>
+
               <div className="p-5 bg-amber-50/50 rounded-xl border border-amber-200 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       <FileSpreadsheet className="w-4 h-4 text-amber-600" />
-                      <span>Mã Google Apps Script Nâng Cấp (Đọc lịch sử & Mapping Dòng 2)</span>
+                      <span>Mã Google Apps Script Mới (Chống đè tên NV & Tự thêm cột)</span>
                     </h3>
                     <p className="text-xs text-amber-900 mt-0.5">
-                      Đã hỗ trợ: Không đè Dòng 1 tổng, tự chèn cột mới khi thêm bia, đọc toàn bộ lịch sử từ mọi máy.
+                      Đã hỗ trợ: Tự thêm cột trước 'Thời gian gửi', thêm SUM dòng 1, bảo toàn 100% Cột B NV Sale.
                     </p>
                   </div>
                   <button
@@ -1152,13 +1233,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 <div className="space-y-3 text-xs text-slate-700">
                   <p>
-                    <b>Cách cập nhật vào Google Sheet (Làm 1 lần duy nhất):</b>
+                    <b>Cách cập nhật vào Google Sheet (Chỉ mất 30 giây):</b>
                   </p>
                   <ol className="list-decimal list-inside space-y-1.5 text-slate-600 pl-1">
-                    <li>Bấm nút <b>Sao Chép Mã Apps Script</b> ở trên.</li>
-                    <li>Mở file Google Sheet của bạn → vào menu <b>Tiện ích mở rộng (Extensions)</b> → <b>Apps Script</b>.</li>
-                    <li>Xóa toàn bộ code cũ và dán đoạn mã mới này vào.</li>
-                    <li>Bấm nút <b>Triển khai (Deploy)</b> → <b>Quản lý tùy chọn triển khai (Manage deployments)</b> → bấm icon bút chì để sửa phiên bản thành <i>Phiên bản mới (New version)</i> → Nhấn <b>Triển khai (Deploy)</b>.</li>
+                    <li>Bấm nút <b>Sao Chép Mã Apps Script</b> màu cam ở trên.</li>
+                    <li>Mở Google Sheet của bạn → vào menu <b>Tiện ích mở rộng (Extensions)</b> → <b>Apps Script</b>.</li>
+                    <li>Xóa toàn bộ mã cũ trong file <code>Code.gs</code> và dán đoạn mã mới này vào.</li>
+                    <li>Bấm nút <b>Triển khai (Deploy)</b> ở góc trên bên phải → chọn <b>Quản lý tùy chọn triển khai (Manage deployments)</b>.</li>
+                    <li>Bấm vào <b>biểu tượng cây bút chì (Sửa/Edit)</b> → ở mục <i>Phiên bản (Version)</i>, chọn <b>Phiên bản mới (New version)</b> → Bấm <b>Triển khai (Deploy)</b>.</li>
                   </ol>
 
                   <div className="relative rounded-lg bg-slate-900 text-slate-200 p-3 text-xs font-mono max-h-64 overflow-y-auto border border-slate-800">

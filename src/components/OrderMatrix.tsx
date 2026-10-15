@@ -232,11 +232,11 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
       {/* Basic Date and Sales Rep Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Order Date (Column B) */}
+          {/* Order Date (Column A) */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-amber-600" />
-              <span>Ngày đặt hàng (Cột B)</span>
+              <span>Ngày đặt hàng (Cột A)</span>
             </label>
             <div className="flex gap-2">
               <input
@@ -255,11 +255,11 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
             </div>
           </div>
 
-          {/* Sales Rep (Column C) */}
+          {/* Sales Rep (Column B) */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <User className="w-4 h-4 text-amber-600" />
-              <span>NV Sale đặt đơn (Cột C)</span>
+              <span>NV Sale đặt đơn (Cột B)</span>
             </label>
             <div className="relative">
               <input
@@ -313,7 +313,7 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
         {/* Step 1: Customer Dropdown Selection */}
         <div className="space-y-1.5">
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-            1. Chọn Quán / Khách hàng (Cột D):
+            1. Chọn Quán / Khách hàng (Cột C):
           </label>
           <div className="relative">
             <select
@@ -486,7 +486,7 @@ export const OrderMatrix: React.FC<OrderMatrixProps> = ({
                   STT
                 </th>
                 <th className="py-3 px-4 min-w-[200px] border-r border-slate-200">
-                  Khách Hàng (Cột D)
+                  Khách Hàng (Cột C)
                 </th>
 
                 {/* Product Columns matching screenshot: Bom 50l (bom), Bom 30l (bom), Keg1L (két) */}

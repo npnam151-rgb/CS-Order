@@ -133,6 +133,14 @@ export default function App() {
       return;
     }
 
+    if (/^\d+$/.test(salesRep.trim())) {
+      setSubmitStatus({
+        success: false,
+        message: `"${salesRep}" là chữ số, không phải tên nhân viên. Vui lòng chọn hoặc gõ đúng tên NV Sale trước khi gửi!`,
+      });
+      return;
+    }
+
     const validRows = rows.filter(r => {
       if (!r.customerId) return false;
       return Object.values(r.quantities).some(q => q > 0);

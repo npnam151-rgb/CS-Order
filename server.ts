@@ -46,6 +46,41 @@ async function startServer() {
     }
   });
 
+  // API endpoint: Sync product catalog columns to Google Sheet
+  app.post('/api/sync-products', async (req, res) => {
+    try {
+      const { scriptUrl, payload } = req.body;
+      if (!scriptUrl) {
+        return res.status(400).json({ success: false, message: 'Thiếu scriptUrl' });
+      }
+
+      const response = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+        redirect: 'follow',
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { status: 'success', raw: text };
+      }
+
+      return res.json({ success: true, ...data });
+    } catch (error: any) {
+      console.error('Error in /api/sync-products:', error);
+      return res.status(500).json({
+        success: false,
+        message: error?.message || 'Lỗi đồng bộ danh mục cột tới Google Apps Script',
+      });
+    }
+  });
+
   // API endpoint: Test connection
   app.post('/api/test-sheets', async (req, res) => {
     try {

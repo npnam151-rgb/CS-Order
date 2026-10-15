@@ -1,14 +1,19 @@
 import { ProductItem, OrderRowData } from '../types';
 
 export const APPS_SCRIPT_TEMPLATE = `/**
- * Google Apps Script - CS Order (Hỗ trợ đọc lịch sử toàn hệ thống & Mapping cột động theo Dòng 2)
+ * Google Apps Script - CS Order (Bản chuẩn 100% - Chống đè tên NV & Tự động chèn cột mặt hàng mới)
  * Tên trang tính mặc định: Đặt bia sỉ
  * 
- * LƯU Ý QUAN TRỌNG:
- * - Dòng 1: Dùng để tính tổng bằng công thức Excel/Sheets (Script KHÔNG BAO GIỜ chạm vào Dòng 1).
- * - Dòng 2: Dòng tiêu đề: [Ngày đặt hàng, NV Sale đặt đơn, Khách hàng, Bom 50l (bom), Bom 30l (bom), Keg1L (két), ..., Thời gian gửi].
- * - Dòng 3 trở đi: Dữ liệu các đơn hàng được ghi nhận.
- * - Tự động thêm cột mới trước cột "Thời gian gửi" nếu bạn thêm mặt hàng mới trên App!
+ * NGUYÊN TẮC CỐT LÕI:
+ * - Dòng 1: Dòng công thức SUM tính tổng (Script tự động copy công thức =SUM(...) khi thêm cột mới).
+ * - Dòng 2: Dòng tiêu đề:
+ *     Cột 1 (A): Ngày đặt hàng
+ *     Cột 2 (B): NV Sale đặt đơn (TUYỆT ĐỐI BẢO TOÀN, KHÔNG BAO GIỜ BỊ ĐÈ BỞI SỐ LƯỢNG MẶT HÀNG)
+ *     Cột 3 (C): Khách hàng
+ *     Cột 4 trở đi (D, E, F, G...): Các mặt hàng bia (Bom 50l, Bom 30l, Keg1L, Bom 20L...)
+ *     Cột cuối cùng: Thời gian gửi
+ * - Khi thêm sản phẩm mới (từ Admin hoặc khi lên đơn): Script tự động chèn cột mới ngay trước cột "Thời gian gửi",
+ *   thiết lập màu nền vàng nhạt, in đậm và điền sẵn công thức SUM ở Dòng 1!
  */
 
 function doGet(e) {
@@ -116,80 +121,152 @@ function doPost(e) {
     var lastRow = sheet.getLastRow();
     var lastCol = sheet.getLastColumn();
 
-    // Nếu sheet mới chưa có tiêu đề ở dòng 2
+    // 1. Khởi tạo cấu trúc bảng nếu sheet mới chưa có tiêu đề ở dòng 2
     if (lastRow < 2) {
       var initialHeaders = ["Ngày đặt hàng", "NV Sale đặt đơn", "Khách hàng", "Bom 50l (bom)", "Bom 30l (bom)", "Keg1L (két)", "Thời gian gửi"];
       sheet.getRange(2, 1, 1, initialHeaders.length).setValues([initialHeaders]);
       sheet.getRange(2, 1, 1, initialHeaders.length).setFontWeight("bold").setBackground("#FEF3C7").setFontColor("#78350F");
+      // Dòng 1 tính tổng cho các cột bia ban đầu
+      sheet.getRange("D1").setFormula("=SUM(D3:D)");
+      sheet.getRange("E1").setFormula("=SUM(E3:E)");
+      sheet.getRange("F1").setFormula("=SUM(F3:F)");
+      sheet.getRange("D1:F1").setFontWeight("bold").setFontColor("#DC2626");
       lastCol = initialHeaders.length;
     }
 
-    // 1. ĐỌC DÒNG 2 ĐỂ TẠO MAPPING CỘT DỰA VÀO TÊN TIÊU ĐỀ
+    function cleanStr(s) {
+      return String(s || "").trim().toLowerCase();
+    }
+
+    // Helper: Chuyển đổi số thứ tự cột sang chữ cái (1 -> A, 4 -> D, 27 -> AA,...)
+    function getColumnLetter(colIndex) {
+      var temp, letter = '';
+      while (colIndex > 0) {
+        temp = (colIndex - 1) % 26;
+        letter = String.fromCharCode(temp + 65) + letter;
+        colIndex = Math.floor((colIndex - temp - 1) / 26);
+      }
+      return letter;
+    }
+
+    // Đọc danh sách tiêu đề dòng 2 hiện tại
     lastCol = Math.max(sheet.getLastColumn(), 6);
     var headerRowValues = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
 
-    var headerMap = {};
+    // Tìm vị trí cột "Thời gian gửi"
+    var timeColIndex = 0;
     for (var c = 0; c < headerRowValues.length; c++) {
-      var hText = String(headerRowValues[c] || "").trim().toLowerCase();
-      if (hText) {
-        headerMap[hText] = c + 1; // 1-based column index
+      var hClean = cleanStr(headerRowValues[c]);
+      if (hClean.indexOf("thời gian") !== -1 || hClean.indexOf("time") !== -1) {
+        timeColIndex = c + 1;
+        break;
       }
     }
 
-    // Xác định cột "Thời gian gửi"
-    var timeColIndex = headerMap["thời gian gửi"] || headerMap["thời gian"] || headerMap["time"] || 0;
     if (timeColIndex === 0) {
       timeColIndex = headerRowValues.length + 1;
-      sheet.getRange(2, timeColIndex).setValue("Thời gian gửi").setFontWeight("bold");
-      headerMap["thời gian gửi"] = timeColIndex;
+      sheet.getRange(2, timeColIndex).setValue("Thời gian gửi").setFontWeight("bold").setBackground("#FEF3C7").setHorizontalAlignment("center");
       lastCol = timeColIndex;
     }
 
-    // 2. MAPPING SẢN PHẨM & TỰ ĐỘNG THÊM CỘT NẾU CÓ MẶT HÀNG MỚI
+    // Hàm đảm bảo cột sản phẩm tồn tại trước cột thời gian gửi
+    function ensureProductColumn(prodName, prodUnit) {
+      var fullTitle = prodName + (prodUnit ? " (" + prodUnit + ")" : "");
+      var colKey = cleanStr(fullTitle);
+      var nameKey = cleanStr(prodName);
+
+      // Đọc lại tiêu đề hiện tại của dòng 2
+      var curColCount = Math.max(sheet.getLastColumn(), timeColIndex);
+      var curHeaders = sheet.getRange(2, 1, 1, curColCount).getValues()[0];
+
+      // Tìm trong các cột bia (CỘT 4 TRỞ ĐI, và trước timeColIndex)
+      for (var col = 4; col <= curColCount; col++) {
+        if (col === timeColIndex) continue;
+        var headerVal = cleanStr(curHeaders[col - 1]);
+        if (!headerVal) continue;
+        if (headerVal === colKey || headerVal === nameKey) {
+          return col; // Cột đã tồn tại
+        }
+      }
+
+      // Kiểm tra xem có cột trống ngay trước timeColIndex không
+      var prevCol = timeColIndex - 1;
+      var prevHeader = (prevCol >= 4 && prevCol <= curHeaders.length) ? cleanStr(curHeaders[prevCol - 1]) : "has_data";
+
+      if (prevCol >= 4 && !prevHeader) {
+        // Tận dụng cột trống có sẵn
+        sheet.getRange(2, prevCol).setValue(fullTitle)
+          .setFontWeight("bold")
+          .setBackground("#FEF3C7")
+          .setFontColor("#78350F")
+          .setHorizontalAlignment("center");
+
+        var colLet = getColumnLetter(prevCol);
+        sheet.getRange(1, prevCol).setFormula("=SUM(" + colLet + "3:" + colLet + ")")
+          .setFontWeight("bold")
+          .setFontColor("#DC2626")
+          .setHorizontalAlignment("center");
+
+        return prevCol;
+      }
+
+      // Chèn cột mới ngay trước cột thời gian gửi
+      sheet.insertColumnBefore(timeColIndex);
+      var newCol = timeColIndex;
+
+      sheet.getRange(2, newCol).setValue(fullTitle)
+        .setFontWeight("bold")
+        .setBackground("#FEF3C7")
+        .setFontColor("#78350F")
+        .setHorizontalAlignment("center");
+
+      var newColLet = getColumnLetter(newCol);
+      sheet.getRange(1, newCol).setFormula("=SUM(" + newColLet + "3:" + newColLet + ")")
+        .setFontWeight("bold")
+        .setFontColor("#DC2626")
+        .setHorizontalAlignment("center");
+
+      timeColIndex++; // Dịch cột thời gian sang phải
+      return newCol;
+    }
+
+    // 2. XỬ LÝ LỆNH ĐỒNG BỘ CỘT TỪ ADMIN (Khi thêm/sửa mặt hàng trên App)
+    if (data.action === "syncColumns" || data.action === "syncProducts") {
+      var syncedList = [];
+      if (data.products && data.products.length > 0) {
+        for (var p = 0; p < data.products.length; p++) {
+          var pItem = data.products[p];
+          if (pItem.active !== false) {
+            var colIdx = ensureProductColumn(pItem.name, pItem.unit);
+            syncedList.push({ id: pItem.id, name: pItem.name, column: colIdx });
+          }
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Đã đồng bộ cột mặt hàng vào Google Sheet thành công!",
+        syncedProducts: syncedList,
+        totalColumns: sheet.getLastColumn(),
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. MAPPING CỘT CHO TẤT CẢ SẢN PHẨM TRONG ĐƠN HÀNG
     var productCols = {};
     if (data.products && data.products.length > 0) {
       for (var p = 0; p < data.products.length; p++) {
         var prod = data.products[p];
-        var colName = prod.name + " (" + prod.unit + ")";
-        var colKey = colName.trim().toLowerCase();
-        var simpleKey = prod.name.trim().toLowerCase();
-
-        var matchedCol = headerMap[colKey];
-        if (!matchedCol) {
-          for (var h in headerMap) {
-            if (h.indexOf(simpleKey) !== -1) {
-              matchedCol = headerMap[h];
-              break;
-            }
-          }
-        }
-
-        // Nếu cột chưa có trên dòng 2: Chèn cột mới trước cột "Thời gian gửi"
-        if (!matchedCol) {
-          sheet.insertColumnBefore(timeColIndex);
-          sheet.getRange(2, timeColIndex).setValue(colName).setFontWeight("bold").setBackground("#FEF3C7");
-          matchedCol = timeColIndex;
-          timeColIndex++;
-          headerMap["thời gian gửi"] = timeColIndex;
-        }
-
-        productCols[prod.id] = matchedCol;
-        productCols[colName] = matchedCol;
+        var mappedCol = ensureProductColumn(prod.name, prod.unit);
+        productCols[prod.id] = mappedCol;
       }
     }
 
-    // 3. TÌM DÒNG TRỐNG TIẾP THEO (SAU DÒNG 2)
+    // 4. GHI DỮ LIỆU ĐƠN HÀNG VÀO DÒNG MỚI
     var currentLastRow = Math.max(sheet.getLastRow(), 2);
     var startInsertRow = currentLastRow + 1;
-
-    // 4. GHI DỮ LIỆU ĐÚNG THEO CỘT DÒNG 2
     var finalColCount = sheet.getLastColumn();
     var rowsToWrite = [];
     var nowTimestamp = Utilities.formatDate(new Date(), "GMT+7", "HH:mm:ss dd/MM/yyyy");
-
-    var dateCol = headerMap["ngày đặt hàng"] || 1;
-    var repCol = headerMap["nv sale đặt đơn"] || headerMap["nv sale"] || 2;
-    var custCol = headerMap["khách hàng"] || 3;
 
     if (data.orderRows && data.orderRows.length > 0) {
       for (var r = 0; r < data.orderRows.length; r++) {
@@ -199,31 +276,33 @@ function doPost(e) {
           rowArr[k] = "";
         }
 
-        rowArr[dateCol - 1] = data.orderDate || "";
-        rowArr[repCol - 1] = data.salesRep || "";
-        rowArr[custCol - 1] = ord.customerName || "";
+        // CỘT 1 (A): Ngày đặt hàng
+        rowArr[0] = data.orderDate || "";
 
-        // Điền số lượng từng mặt hàng
+        // CỘT 2 (B): NV Sale đặt đơn (BẢO TOÀN TÊN NHÂN VIÊN, TUYỆT ĐỐI KHÔNG BỊ ĐÈ!)
+        rowArr[1] = String(data.salesRep || "").trim();
+
+        // CỘT 3 (C): Khách hàng (Tên quán)
+        rowArr[2] = String(ord.customerName || "").trim();
+
+        // CÁC CỘT SẢN PHẨM (CHỈ ĐƯỢC GHI VÀO CỘT >= 4 VÀ KHÁC timeColIndex!)
         if (ord.quantities) {
           for (var pId in ord.quantities) {
             var targetCol = productCols[pId];
-            if (targetCol && targetCol <= finalColCount) {
-              rowArr[targetCol - 1] = ord.quantities[pId] || 0;
+            var qty = Number(ord.quantities[pId]);
+            // RÀNG BUỘC BẢO MẬT: targetCol PHẢI >= 4 để bảo vệ Cột 1, 2, 3
+            if (targetCol && targetCol >= 4 && targetCol !== timeColIndex && targetCol <= finalColCount) {
+              rowArr[targetCol - 1] = isNaN(qty) ? 0 : qty;
             }
           }
         }
 
-        // Ghi thời gian gửi
+        // CỘT THỜI GIAN GỬI
         if (timeColIndex && timeColIndex <= finalColCount) {
           rowArr[timeColIndex - 1] = nowTimestamp;
         }
 
         rowsToWrite.push(rowArr);
-      }
-    } else if (data.rows && data.rows.length > 0) {
-      // Hỗ trợ ngược cho định dạng mảng dòng cũ
-      for (var j = 0; j < data.rows.length; j++) {
-        sheet.appendRow(data.rows[j]);
       }
     }
 
@@ -233,7 +312,7 @@ function doPost(e) {
 
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
-      rowsCount: rowsToWrite.length || (data.rows ? data.rows.length : 0),
+      rowsCount: rowsToWrite.length,
       startRow: startInsertRow,
       timestamp: new Date().toISOString()
     })).setMimeType(ContentService.MimeType.JSON);
@@ -250,10 +329,11 @@ function doPost(e) {
 `;
 
 export interface SyncPayload {
+  action?: string;
   sheetName: string;
   orderDate: string;
   salesRep: string;
-  products: { id: string; name: string; unit: string }[];
+  products: { id: string; name: string; unit: string; active?: boolean }[];
   orderRows: {
     customerId: string;
     customerName: string;
@@ -261,7 +341,7 @@ export interface SyncPayload {
     notes?: string;
   }[];
   productHeaders: string[];
-  rows: (string | number)[][];
+  rows: (string | number)[][] ;
 }
 
 export function buildSyncPayload(
@@ -304,7 +384,7 @@ export function buildSyncPayload(
   return {
     sheetName: sheetName || 'Đặt bia sỉ',
     orderDate,
-    salesRep,
+    salesRep: String(salesRep || '').trim(),
     products: activeProducts.map(p => ({ id: p.id, name: p.name, unit: p.unit })),
     orderRows: validOrderRows.map(r => ({
       customerId: r.customerId,
@@ -394,6 +474,60 @@ export async function sendOrderToGoogleSheets(
       message: `Lỗi kết nối tới Google Sheets: ${err?.message || 'Không thể gửi dữ liệu'}`,
     };
   }
+}
+
+/**
+ * Sync products list directly to Google Sheet so columns are created immediately
+ */
+export async function syncProductsToGoogleSheets(
+  scriptUrl: string,
+  sheetName: string = 'Đặt bia sỉ',
+  products: ProductItem[]
+): Promise<{ success: boolean; message: string }> {
+  if (!scriptUrl || !scriptUrl.trim()) {
+    return { success: false, message: 'Chưa cấu hình URL Google Sheets.' };
+  }
+
+  const cleanUrl = scriptUrl.trim();
+  const payload = {
+    action: 'syncColumns',
+    sheetName: sheetName || 'Đặt bia sỉ',
+    products: products.map(p => ({ id: p.id, name: p.name, unit: p.unit, active: p.active })),
+  };
+
+  try {
+    const res = await fetch('/api/sync-products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptUrl: cleanUrl, payload }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'success' || data.success) {
+        return { success: true, message: data.message || 'Đồng bộ cột sản phẩm vào Google Sheet thành công!' };
+      }
+    }
+  } catch (proxyErr) {
+    console.warn('Proxy sync-products failed, trying direct fetch...', proxyErr);
+  }
+
+  try {
+    const res = await fetch(cleanUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, message: data.message || 'Đã đồng bộ cột mặt hàng vào Google Sheet!' };
+    }
+  } catch {
+    // fallback
+  }
+
+  return { success: false, message: 'Không thể đồng bộ danh mục cột tới Google Sheet. Vui lòng kiểm tra kết nối.' };
 }
 
 export interface SheetHistoryRecord {
